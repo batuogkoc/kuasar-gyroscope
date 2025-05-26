@@ -1,110 +1,74 @@
 #include "Arduino.h"
-// #include "HardwareSerial.h"
+#include <ESP32Servo.h>
 #include <Wire.h>
-// #include "soc/soc_caps.h"
-// #include "esp32-hal-i2c.h"
-extern "C" {
-  #include "driver/i2c.h"
-  #include "driver/gpio.h"
-  #include "esp_system.h"
-}
-// #include <Adafruit_BNO055.h>
-// #include <Adafruit_Sensor.h>
+#include <Adafruit_BNO055.h>
+#include <Adafruit_Sensor.h>
 
 
 // === Nesneler ===
-// Adafruit_BNO055 bno = Adafruit_BNO055(55);
+Adafruit_BNO055 bno = Adafruit_BNO055(55);
+Servo esc;
+
+
+// === Ayarlar ===
+float setpoint = 0;       // Başlangıçta hedef roll açısı (düz konum)
+float roll_angle = 0;
+int pwm = 1500;
 
 void setup() {
+  int timeout=0;
   delay(1000);  
   Serial.begin(115200);
-  // Wire.begin(16, 17, 400000);
   Wire.begin();
-  int timeout=0;
-  // i2c_get_timeout(I2C_NUM_0, &timeout);
-  Serial.print("Old timeout: ");
-  Serial.println(timeout);
-  // i2c_set_timeout(I2C_NUM_0, 16000);
-  
-
-  i2c_get_timeout(I2C_NUM_0, &timeout);
-  Serial.print("New timeout: ");
-  Serial.println(timeout);
-  // Wire.setTimeOut(0xFFFFFFFF);
-  // Wire.setTimeout(0xFFFFFFFF);
-  // Wire.setTimeOut(0);
-  // Wire.setTimeout(0);
-
-  Serial.println("Timeouts");
-    // Serial.println(Wire.getTimeOut());
-  // Serial.println(Wire.getTimeout());
   pinMode(19, OUTPUT);
 
 
-  //  if (!bno.begin()) {
-  //    Serial.println("BNO055 not found");
-  //    while (1);
-  //  }
-  //  Serial.println("BNO055 found");
-}
+  if (!bno.begin()) {
+    Serial.println("BNO055 not found");
+    while (1);
+  }
+  Serial.println("BNO055 found");
 
-uint8_t check_slave_connection(uint8_t address){
-  Wire.beginTransmission(address);
-  // Wire.write(0);
-  return Wire.endTransmission();
-}
-
-
-uint8_t scan_i2c(){
-  uint8_t nDevices = 0;
-  for(int address = 1; address < 127; address++ ) {
-   uint8_t error = check_slave_connection(address);
-  //  Serial.println(error);
-   if (error == 0) {
-     Serial.print("I2C device found at address 0x");
-     if (address<16) {
-       Serial.print("0");
-     }
-     Serial.println(address,HEX);
-     nDevices++;
-   }
-   else if (error==4) {
-     Serial.print("Unknow error at address 0x");
-     if (address<16) {
-       Serial.print("0");
-     }
-     Serial.println(address,HEX);
-   }   
-   delay(1); 
- }
- return nDevices;
-}
-
-void search_loop(){
-   Serial.println("Scanning...");
- 
-   int nDevices = scan_i2c();
-   if (nDevices == 0) {
-     Serial.println("No I2C devices found\n");
-   }
-   else {
-     Serial.println("done\n");
-   }
-   delay(1000);    
-}
-
-void bno_test_loop(){
-  digitalWrite(19, HIGH);
-  uint8_t retval = check_slave_connection(40);
-  // delay(200);
-  digitalWrite(19, LOW);
-  Serial.println(retval);
-  delay(200);
+  bno.setExtCrystalUse(true);
+  
+  esc.attach(2, 1000, 2000);      // ESC sinyal pini
+  esc.writeMicroseconds(1500);    // motoru durdur
+  delay(2000);                    // ESC arming süresi
 }
 
 void loop() { 
-  // search_loop();
-  check_slave_connection(0x77);
-  check_slave_connection(40);
-  delay(100);
+  // Roll açısını al (x ekseni)
+  sensors_event_t orientation;
+  bno.getEvent(&orientation, Adafruit_BNO055::VECTOR_EULER);
+  roll_angle = orientation.orientation.x;
+
+
+  // Açıyı -180 ile +180 arasına düzelt
+  if (roll_angle > 180) roll_angle -= 360;
+  if (roll_angle < -180) roll_angle += 360;
+
+
+  // Hata = setpoint - mevcut açı
+  float error = setpoint - roll_angle;
+
+
+  // Basit orantılı kontrol: PWM farkı = K * hata
+  float K = 5.0;  // bu değeri sistemine göre ayarla
+  int correction = K * error;
+
+
+  // ESC PWM sinyali oluştur
+  pwm = 1500 + correction;
+  pwm = constrain(pwm, 1000, 2000);
+  esc.writeMicroseconds(pwm);
+
+
+  // Seri monitör
+  Serial.print("Roll: ");
+  Serial.print(roll_angle);
+  Serial.print(" | PWM: ");
+  Serial.println(pwm);
+
+
+  // delay(20);  // ~50Hz kontrol döngüsü
 }
