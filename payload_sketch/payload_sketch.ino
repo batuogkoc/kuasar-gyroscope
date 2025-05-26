@@ -43,57 +43,7 @@ struct __attribute__((packed)) FloatData {
   uint8_t checksum = 0;
 };
 
-void setup() {
-  pinMode(buzzer, OUTPUT);
-  pinMode(2, OUTPUT);  //LED SANIRIM 
-  digitalWrite(2, 1);
-  pinMode(32, OUTPUT);
-  pinMode(33, OUTPUT);
-  digitalWrite(32, 0);
-  digitalWrite(33, 0);
-  Serial.println("I2C başlatıldı.");
-  Wire.begin(21,22);
-  Wire.setClock(400000);
-  Serial1.begin(115200, SERIAL_8N1, 9, 10);
-  Serial1.println("Serial Port Activated");
-  Serial1.println("UART başlatıldı.");
-  Serial2.begin(115200, SERIAL_8N1, 16, 17);
-  Serial.begin(115200, SERIAL_8N1, 3, 1);
-  bme.begin();
-  bno.begin();
-  e22.begin();
 
-  delay(1000);
-
-  bno.setExtCrystalUse(true);
-
-  delay(200);
-  esc.attach(2, 1000, 2000);      // ESC sinyal pini
-  esc.writeMicroseconds(1500);    // motoru durdur
-  delay(2000);  
-  bme.setSampling(Adafruit_BME280::MODE_FORCED,
-                  Adafruit_BME280::SAMPLING_NONE,
-                  Adafruit_BME280::SAMPLING_X2,
-                  Adafruit_BME280::SAMPLING_NONE,
-                  Adafruit_BME280::FILTER_X4);
-
-  delay(1000);
-
-  float altitudeSum = 0;
-  const int AltitudeSamples = 100;
-
-   for (int i = 0; i < AltitudeSamples; i++) {
-    bme.takeForcedMeasurement();
-    altitudeSum += bme.readAltitude(SEALEVELPRESSURE_HPA);
-    delay(20);
-  }
-
-  baseAltitude = (altitudeSum / AltitudeSamples) - 40;
-  Serial1.print("Base Altitude: ");
-  Serial1.println(baseAltitude);
-  delay(200);
-
-}
 FloatData readBNO055() {
   imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
   float gY = gravity.y();
@@ -125,8 +75,8 @@ FloatData readGPS() {
     0,            // AngleY
   };
 
-  while (Serial.available() > 0) {
-    gps.encode(Serial.read());
+  while (Serial1.available() > 0) {
+    gps.encode(Serial1.read());
   }
 
   if (gps.location.isValid() && gps.location.isUpdated()) {
@@ -179,6 +129,7 @@ void sendLoRa(FloatData ori, FloatData alt, FloatData gps) {
   d.checksum = calculateChecksum(d);
 
   ResponseStatus rs = e22.sendFixedMessage(0x00, 0x02, 0x12, (uint8_t*)&d, sizeof(d));
+  Serial.println(rs.getResponseDescription());
 
   paketSayaci++;
   if (paketSayaci > 255) {
@@ -197,6 +148,64 @@ uint8_t calculateChecksum(const FloatData& d) {
 
   return sum;
 }
+
+
+void setup() {
+  Serial.begin(115200, SERIAL_8N1, 3, 1); //serial debug
+  Serial.println("Serial Activated");
+  Serial1.begin(115200, SERIAL_8N1, 18, 19); //gps
+  Serial.println("Serial1 Activated");
+  Serial2.begin(115200, SERIAL_8N1, 16, 17); //lora
+  Serial.println("Serial2 Activated");
+
+  pinMode(buzzer, OUTPUT);
+  pinMode(2, OUTPUT);  //LED SANIRIM 
+  digitalWrite(2, 1);
+  pinMode(32, OUTPUT);
+  pinMode(33, OUTPUT);
+  digitalWrite(32, 0);
+  digitalWrite(33, 0);
+
+  Wire.begin(21,22);
+  Wire.setClock(400000);
+  Serial.println("I2C başlatıldı.");
+  bme.begin();
+  bno.begin();
+  e22.begin();
+
+  delay(1000);
+
+  bno.setExtCrystalUse(true);
+
+  delay(200);
+  esc.attach(2, 1000, 2000);      // ESC sinyal pini
+  esc.writeMicroseconds(1500);    // motoru durdur
+  delay(2000);  
+  bme.setSampling(Adafruit_BME280::MODE_FORCED,
+                  Adafruit_BME280::SAMPLING_NONE,
+                  Adafruit_BME280::SAMPLING_X2,
+                  Adafruit_BME280::SAMPLING_NONE,
+                  Adafruit_BME280::FILTER_X4);
+
+  delay(1000);
+
+  float altitudeSum = 0;
+  const int AltitudeSamples = 100;
+
+   for (int i = 0; i < AltitudeSamples; i++) {
+    bme.takeForcedMeasurement();
+    altitudeSum += bme.readAltitude(SEALEVELPRESSURE_HPA);
+    delay(20);
+  }
+
+  baseAltitude = (altitudeSum / AltitudeSamples) - 40;
+  Serial.print("Base Altitude: ");
+  Serial.println(baseAltitude);
+  delay(200);
+
+  Serial.println("Setup Complete");
+}
+
 void loop() {
   if (millis() - lastSend >= interval) {
     lastSend = millis();
@@ -205,21 +214,21 @@ void loop() {
     FloatData gps = readGPS();
     uint16_t pwmVal = calculatePWM();
    
-    Serial1.print("Altitude: ");
-    Serial1.print(alt.altitude);
-    Serial1.print(" Tilt Angle: ");
-    Serial1.print(ori.tiltAngle);
-    Serial1.print(" Lat: ");
-    Serial1.print(gps.latitude);
-    Serial1.print(" Long: ");
-    Serial1.print(gps.longitude);
-    Serial1.print(" GPS Alt: ");
-    Serial1.print(gps.gpsAltitude);
-    Serial1.print(" | PWM: ");
-    Serial1.println(pwmVal);
+    Serial.print("Altitude: ");
+    Serial.print(alt.altitude);
+    Serial.print(" Tilt Angle: ");
+    Serial.print(ori.tiltAngle);
+    Serial.print(" Lat: ");
+    Serial.print(gps.latitude);
+    Serial.print(" Long: ");
+    Serial.print(gps.longitude);
+    Serial.print(" GPS Alt: ");
+    Serial.print(gps.gpsAltitude);
+    Serial.print(" | PWM: ");
+    Serial.println(pwmVal);
 
     
-    Serial1.println();
+    Serial.println();
     sendLoRa(ori, alt, gps);
   }
 }
