@@ -153,7 +153,7 @@ uint8_t calculateChecksum(const FloatData& d) {
 void setup() {
   Serial.begin(115200, SERIAL_8N1, 3, 1); //serial debug
   Serial.println("Serial Activated");
-  Serial1.begin(115200, SERIAL_8N1, 18, 19); //gps
+  Serial1.begin(115200, SERIAL_8N1, 12, 14); //gps
   Serial.println("Serial1 Activated");
   Serial2.begin(115200, SERIAL_8N1, 16, 17); //lora
   Serial.println("Serial2 Activated");
