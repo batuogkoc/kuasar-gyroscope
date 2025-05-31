@@ -7,9 +7,28 @@
 #include <TinyGPS++.h>
 #include <ESP32Servo.h>
 #include <HardwareSerial.h>
+#include "../shared/LoraData.h"
 
 #define SEALEVELPRESSURE_HPA (1013.25)
-#define buzzer 13
+#define BUZZER_PIN 13
+
+#define LORA_ADDH 0
+#define LORA_ADDL 5
+#define LORA_CHAN 21
+#define LORA_M0_PIN 32
+#define LORA_M1_PIN 33
+#define LORA_AUX_PIN 25
+#define LoraSerial Serial2
+#define LORA_SERIAL_PORT_TX 17
+#define LORA_SERIAL_PORT_RX 16
+
+#define GPS_SERIAL_PORT_TX 14
+#define GPS_SERIAL_PORT_RX 12
+
+#define I2C_SDA 21
+#define I2C_SCL 22
+
+LoRa_E22 e22(LORA_SERIAL_PORT_RX, LORA_SERIAL_PORT_TX, &LoraSerial, LORA_AUX_PIN, LORA_M0_PIN, LORA_M1_PIN, UART_BPS_RATE_115200);
 
 unsigned long lastSend = 0;
 const unsigned long interval = 1000 / 6;
@@ -27,21 +46,19 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 Servo esc;
 Adafruit_BME280 bme;
 TinyGPSPlus gps;
-LoRa_E22 e22(&Serial2, UART_BPS_RATE_115200);
-
-struct __attribute__((packed)) FloatData {
-  uint8_t header = 115;
-  uint8_t teamID = 132;
-  uint8_t packageCounter = 0;
-  uint8_t status = 0;
-  uint8_t tiltAngle;
-  uint16_t altitude;
-  float latitude, longitude;
-  float gpsAltitude;
-  int16_t gY;
-  uint8_t AngleY;
-  uint8_t checksum = 0;
-};
+// struct __attribute__((packed)) FloatData {
+//   uint8_t header = 115;
+//   uint8_t teamID = 132;
+//   uint8_t packageCounter = 0;
+//   uint8_t status = 0;
+//   uint8_t tiltAngle;
+//   uint16_t altitude;
+//   float latitude, longitude;
+//   float gpsAltitude;
+//   int16_t gY;
+//   uint8_t AngleY;
+//   uint8_t checksum = 0;
+// };
 
 
 FloatData readBNO055() {
@@ -128,7 +145,7 @@ void sendLoRa(FloatData ori, FloatData alt, FloatData gps) {
    
   d.checksum = calculateChecksum(d);
 
-  ResponseStatus rs = e22.sendFixedMessage(0x00, 0x02, 0x12, (uint8_t*)&d, sizeof(d));
+  ResponseStatus rs = e22.sendFixedMessage(LORA_ADDH, LORA_ADDL, LORA_CHAN, &d, sizeof(d));
   Serial.println(rs.getResponseDescription());
 
   paketSayaci++;
@@ -152,23 +169,19 @@ uint8_t calculateChecksum(const FloatData& d) {
 
 void setup() {
   Serial.begin(115200, SERIAL_8N1, 3, 1); //serial debug
-  Serial.println("Serial Activated");
-  Serial1.begin(115200, SERIAL_8N1, 12, 14); //gps
-  Serial.println("Serial1 Activated");
-  Serial2.begin(115200, SERIAL_8N1, 16, 17); //lora
-  Serial.println("Serial2 Activated");
+  Serial.println("Serial (Debug) Activated");
+  Serial1.begin(115200, SERIAL_8N1, GPS_SERIAL_PORT_RX, GPS_SERIAL_PORT_TX); //gps
+  Serial.println("Serial1 (GPS) Activated");
+  // Serial2.begin(115200, SERIAL_8N1, 16, 17); //lora
+  // Serial.println("Serial2 Activated");
 
-  pinMode(buzzer, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
   pinMode(2, OUTPUT);  //LED SANIRIM 
   digitalWrite(2, 1);
-  pinMode(32, OUTPUT);
-  pinMode(33, OUTPUT);
-  digitalWrite(32, 0);
-  digitalWrite(33, 0);
 
-  Wire.begin(21,22);
+  Wire.begin(I2C_SDA,I2C_SCL);
   Wire.setClock(400000);
-  Serial.println("I2C başlatıldı.");
+  Serial.println("I2C Activated");
   bme.begin();
   bno.begin();
   e22.begin();
