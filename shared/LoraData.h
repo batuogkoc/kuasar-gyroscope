@@ -1,3 +1,9 @@
+#ifndef LORADATA_H
+#define LORADATA_H
+
+#define LORA_DATA_HEADER 115
+#define LORA_DATA_TEAM_ID 132
+
 struct __attribute__((packed)) FloatData
 {
     uint8_t header;
@@ -12,3 +18,4 @@ struct __attribute__((packed)) FloatData
     uint8_t AngleY;
     uint8_t checksum;
 };
+#endif

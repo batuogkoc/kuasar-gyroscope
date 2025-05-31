@@ -1,21 +1,16 @@
 #include "LoRa_E22.h"
 #include "../shared/LoraData.h"
-// LoRa_E22 e22(&Serial2, UART_BPS_RATE_9600);
-#define M0_PIN 32
-#define M1_PIN 33
-#define AUX_PIN 25
-#define LORA_PORT_TX 17
-#define LORA_PORT_RX 16
+#include "../shared/PayloadPCBHardwareConfig.h"
 
-LoRa_E22 e22(LORA_PORT_RX, LORA_PORT_TX, &Serial2, AUX_PIN, M0_PIN, M1_PIN, UART_BPS_RATE_115200);
+LoRa_E22 e22(LORA_SERIAL_PORT_RX, LORA_SERIAL_PORT_TX, &LoraSerial, LORA_AUX_PIN, LORA_M0_PIN, LORA_M1_PIN, UART_BPS_RATE_115200);
 
-FloatData floatData;
+FloatData receivedData;
 
 void print_config(LoRa_E22 *lora)
 {  
-  Serial.println(Serial2.baudRate());
+  Serial.println(LoraSerial.baudRate());
   ResponseStructContainer response = lora->getConfiguration();
-  Serial.println(Serial2.baudRate());
+  Serial.println(LoraSerial.baudRate());
   Serial.println(response.status.getResponseDescription());
   if (response.status.code == E22_SUCCESS)
   {
@@ -54,57 +49,34 @@ void print_config(LoRa_E22 *lora)
 
 void setup()
 {
-  Serial.begin(115200);                    // Bil seriportu
-  // Serial2.begin(9600, SERIAL_8N1, 16, 17); // lora seriportu
+  DebugSerial.begin(115200);
   e22.begin();
-  // print_config();
 }
 
 void loop()
 {
-  
-  if(e22.available()){
-    ResponseStructContainer rs = e22.receiveMessage(sizeof(FloatData));
-    floatData = *(FloatData*)rs.data;
-    Serial.println(rs.status.getResponseDescription());
-    Serial.print("Team ID: "); Serial.print(floatData.teamID);
-    Serial.print(" Counter: "); Serial.print(floatData.packageCounter);
-    Serial.print(" Status: "); Serial.print(floatData.status);
-    Serial.print(" Angle: "); Serial.print(floatData.tiltAngle);
-    Serial.print(" Alt: "); Serial.print(floatData.altitude);
-    Serial.print(" Lat: "); Serial.print(floatData.latitude, 6);
-    Serial.print(" Long: "); Serial.print(floatData.longitude, 6);
-    Serial.print(" GPS Alt: "); Serial.print(floatData.gpsAltitude);
-    Serial.print(" g - Y: "); Serial.print(floatData.gY);
-    Serial.print(" Angle Y: "); Serial.print(floatData.AngleY);
-    Serial.print(" checkSum: "); Serial.println(floatData.checksum);
+  if (e22.available() > 0) {
+    ResponseStructContainer rsc = e22.receiveMessage(sizeof(FloatData));
+    if(rsc.status.code == E22_SUCCESS){
+      memcpy(&receivedData, rsc.data, sizeof(FloatData));
+
+      if (receivedData.header == LORA_DATA_HEADER) { //Headerı kontrol et bro
+        DebugSerial.print("Team ID: "); DebugSerial.print(receivedData.teamID);
+        DebugSerial.print(" Counter: "); DebugSerial.print(receivedData.packageCounter);
+        DebugSerial.print(" Status: "); DebugSerial.print(receivedData.status);
+        DebugSerial.print(" Angle: "); DebugSerial.print(receivedData.tiltAngle);
+        DebugSerial.print(" Alt: "); DebugSerial.print(receivedData.altitude);
+        DebugSerial.print(" Lat: "); DebugSerial.print(receivedData.latitude, 6);
+        DebugSerial.print(" Long: "); DebugSerial.print(receivedData.longitude, 6);
+        DebugSerial.print(" GPS Alt: "); DebugSerial.print(receivedData.gpsAltitude);
+        DebugSerial.print(" g - Y: "); DebugSerial.print(receivedData.gY);
+        DebugSerial.print(" Angle Y: "); DebugSerial.print(receivedData.AngleY);
+        DebugSerial.print(" checkSum: "); DebugSerial.println(receivedData.checksum);
+      }
+      else{
+        Serial1.println("Incorrect header!");
+      }
+    }
+    rsc.close();
   }
-  
-  // Serial.println(Serial2.baudRate());
-  // delay(1000);
-
-  // delay(1000);
-
-  // if (e22.available() > 0) {
-  //   ResponseStructContainer rsc = e22.receiveMessage(sizeof(FloatData));
-  //   memcpy(&receivedData, rsc.data, sizeof(FloatData));
-  //   rsc.close();
-
-  //   if (receivedData.header == 115) { //Headerı kontrol et bro
-  //     Serial11.print("Team ID: "); Serial11.print(receivedData.teamID);
-  //     Serial11.print(" Counter: "); Serial11.print(receivedData.packageCounter);
-  //     Serial11.print(" Status: "); Serial11.print(receivedData.status);
-  //     Serial11.print(" Angle: "); Serial11.print(receivedData.tiltAngle);
-  //     Serial11.print(" Alt: "); Serial11.print(receivedData.altitude);
-  //     Serial11.print(" Lat: "); Serial11.print(receivedData.latitude, 6);
-  //     Serial11.print(" Long: "); Serial11.print(receivedData.longitude, 6);
-  //     Serial11.print(" GPS Alt: "); Serial11.print(receivedData.gpsAltitude);
-  //     Serial11.print(" g - Y: "); Serial11.print(receivedData.gY);
-  //     Serial11.print(" Angle Y: "); Serial11.print(receivedData.AngleY);
-  //     Serial11.print(" checkSum: "); Serial11.println(receivedData.checksum);
-  //   }
-  //   else{
-  //     Serial1.println("Incorrect header!");
-  //   }
-  // }
 }
